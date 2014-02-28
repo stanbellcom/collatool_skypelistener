@@ -10,18 +10,18 @@ import com.rabbitmq.client.ConnectionFactory;
 
 public class RabbitMQSender {
 
-	final String HOST = "localhost";
-	final int PORT = 5672;
+	//final String HOST = "localhost";
+	//final int PORT = 5672;
 	final String EXCHANGE_NAME = "msg_exchange";
 	final String ROUTING_KEY = "im.skype";
 
 	private Connection connection;
 	private Channel channel;
 
-	public RabbitMQSender() throws IOException {
+	public RabbitMQSender(String host, int port) throws IOException {
 		ConnectionFactory factory = new ConnectionFactory();
-		factory.setHost(HOST);
-		factory.setPort(PORT);
+		factory.setHost(host);
+		factory.setPort(port);
 		connection = factory.newConnection();
 		channel = connection.createChannel();
 

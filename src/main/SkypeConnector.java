@@ -2,8 +2,6 @@ package main;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -20,40 +18,43 @@ public class SkypeConnector {
 	private Statement stmtSkype;
 	private Statement stmtCollatool;
 
-	private RabbitMQSender rabbitSender;
+	private String dbPathSkype;
+	private String dbPathSkypeCopy;
+	private String dbPathCollatool;
 
-	final private String SKYPE_PATH = "/Users/stan/Library/Application Support/Skype/turtletrail";
-	final private String DB_PATH_SKYPE = SKYPE_PATH + "/main.db";
-	final private String DB_PATH_SKYPE_COPY = SKYPE_PATH + "/main_copy.db";
-	final private String DB_PATH_COLLATOOL = SKYPE_PATH + "/collatool.db";
+	public SkypeConnector(String skypePath) {
+		this.dbPathSkype = skypePath + "/main.db";
+		this.dbPathSkypeCopy = skypePath + "/main_copy.db";
+		this.dbPathCollatool = skypePath + "/collatool.db";
+	}
 
 	public void open() throws IOException, ClassNotFoundException, SQLException {
+
 		// init/opening
 		Class.forName("org.sqlite.JDBC");
-		conSkype = DriverManager.getConnection("jdbc:sqlite:" + DB_PATH_SKYPE);
+		conSkype = DriverManager.getConnection("jdbc:sqlite:" + dbPathSkype);
 		stmtSkype = conSkype.createStatement();
-		
-		//add check for database is locked
+
+		// add check for database is locked
 		try {
 			stmtSkype.executeQuery("select 1 from messages;");
-		} catch (SQLException e){
-			if (e.getErrorCode() == 0){//database busy
-				FileUtils.copyFile(new File(DB_PATH_SKYPE), new File(DB_PATH_SKYPE_COPY));
+		} catch (SQLException e) {
+			if (e.getErrorCode() == 0) {// database busy
+				FileUtils.copyFile(new File(dbPathSkype), new File(dbPathSkypeCopy));
 				System.out.println("Skype copy file created");
-				conSkype = DriverManager.getConnection("jdbc:sqlite:" + DB_PATH_SKYPE_COPY);
+				conSkype = DriverManager.getConnection("jdbc:sqlite:" + dbPathSkypeCopy);
 				stmtSkype = conSkype.createStatement();
 			}
 		}
-		
-		conCollatool = DriverManager.getConnection("jdbc:sqlite:" + DB_PATH_COLLATOOL);
+
+		conCollatool = DriverManager.getConnection("jdbc:sqlite:" + dbPathCollatool);
 		stmtCollatool = conCollatool.createStatement();
-		rabbitSender = new RabbitMQSender();
 
 		stmtCollatool.executeUpdate("CREATE TABLE IF NOT EXISTS last_message_timestamp(timestamp INT NOT NULL);");
 	}
 
 	@SuppressWarnings("unchecked")
-	public void processMessages() throws SQLException, IOException {
+	public void processMessages(RabbitMQSender rabbitSender) throws SQLException, IOException {
 		int lastTimestamp = stmtCollatool.executeQuery("SELECT MAX(timestamp) FROM last_message_timestamp;").getInt(1);
 
 		String query = "SELECT * FROM Messages";
@@ -78,7 +79,7 @@ public class SkypeConnector {
 		}
 		if (timestamp != 0)
 			stmtCollatool.executeUpdate("INSERT INTO last_message_timestamp(timestamp) values(" + timestamp + ");");
-		
+
 		rs.close();
 	}
 
@@ -87,11 +88,10 @@ public class SkypeConnector {
 		stmtCollatool.close();
 		conSkype.close();
 		conCollatool.close();
-		rabbitSender.close();
-		
-		File file = new File(DB_PATH_SKYPE_COPY);
-		 
-		if(file.delete()){
+
+		File file = new File(dbPathSkypeCopy);
+
+		if (file.delete()) {
 			System.out.println("Skype copy file deleted");
 		}
 	}
