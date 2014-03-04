@@ -66,19 +66,21 @@ public class SkypeConnector {
 		while (rs.next()) {
 			int id = rs.getInt("id");
 			String author = rs.getString("author");
+			String receiver = rs.getString("dialog_partner");
 			String body = rs.getString("body_xml");
 			timestamp = rs.getInt("timestamp");
 
 			JSONObject obj = new JSONObject();
 			obj.put("id", id);
 			obj.put("sender", author);
+			obj.put("receiver", receiver);
 			obj.put("date", timestamp);
 			obj.put("body", body);
 
 			rabbitSender.sendMessage(obj);
 		}
 		if (timestamp != 0)
-			stmtCollatool.executeUpdate("INSERT INTO last_message_timestamp(timestamp) values(" + timestamp + ");");
+			updateTimestamp(timestamp);
 
 		rs.close();
 	}
@@ -94,5 +96,9 @@ public class SkypeConnector {
 		if (file.delete()) {
 			System.out.println("Skype copy file deleted");
 		}
+	}
+	
+	public void updateTimestamp(int timestamp) throws SQLException{
+		stmtCollatool.executeUpdate("INSERT INTO last_message_timestamp(timestamp) values(" + timestamp + ");");
 	}
 }
